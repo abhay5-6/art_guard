@@ -1,0 +1,3 @@
+watchdog -> api used to talk with my pc
+pillow -> image processing library
+krita-python -> krita's python api to convert kra to jpg
