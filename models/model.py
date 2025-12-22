@@ -1,10 +1,15 @@
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from PIL import Image
 import torch
+import os
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+
 
 # Load once (important for performance)
 _processor = BlipProcessor.from_pretrained(
-    "Salesforce/blip-image-captioning-base"
+    "Salesforce/blip-image-captioning-base",
+     use_fast=True
 )
 _model = BlipForConditionalGeneration.from_pretrained(
     "Salesforce/blip-image-captioning-base"

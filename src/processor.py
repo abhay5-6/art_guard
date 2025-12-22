@@ -2,54 +2,79 @@ import subprocess
 from pathlib import Path
 
 from src.config import JPG_OUTPUT
+from models.model import generate_base_name
 
 KRITA_EXE = r"C:\Program Files\Krita (x64)\bin\krita.exe"
 
 
-def _next_version(output_dir: Path, stem: str) -> int:
-    """
-    Find the next available version number: v001, v002, ...
-    """
-    existing = sorted(output_dir.glob(f"{stem}_v*.jpg"))
+def _next_version(output_dir: Path) -> int:
+    existing = sorted(output_dir.glob("*_v*.jpg"))
     if not existing:
         return 1
+    last = existing[-1].stem
+    return int(last.split("_v")[-1]) + 1
 
-    last = existing[-1].stem  # e.g. APPLE1_v003
-    try:
-        return int(last.split("_v")[-1]) + 1
-    except ValueError:
-        return len(existing) + 1
+
+def _name_file(output_dir: Path) -> Path:
+    return output_dir / "name.txt"
+
+
+def _load_cached_name(output_dir: Path) -> str | None:
+    path = _name_file(output_dir)
+    if path.exists():
+        return path.read_text().strip()
+    return None
+
+
+def _save_cached_name(output_dir: Path, name: str):
+    _name_file(output_dir).write_text(name)
 
 
 def export_kra_to_versioned_jpg(kra_path: Path) -> Path:
-    """
-    Export a flattened JPEG from a .kra using Krita CLI.
-    Creates a new versioned JPG on every call.
-    """
     kra_path = Path(kra_path)
 
     if not kra_path.exists() or kra_path.suffix.lower() != ".kra":
         raise ValueError(f"Invalid .kra file: {kra_path}")
 
-    artwork_name = kra_path.stem
-
-    # Output directory for this artwork
-    out_dir = JPG_OUTPUT / artwork_name
+    out_dir = JPG_OUTPUT / kra_path.stem
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Decide version
-    version = _next_version(out_dir, artwork_name)
-    output_jpg = out_dir / f"{artwork_name}_v{version:03d}.jpg"
+    version = _next_version(out_dir)
 
-    # Krita CLI command (exactly what worked in PowerShell)
-    cmd = [
-        KRITA_EXE,
-        str(kra_path),
-        "--export",
-        "--export-filename",
-        str(output_jpg),
-    ]
+    # ---- base name resolution (CACHED) ----
+    base_name = _load_cached_name(out_dir)
 
-    subprocess.run(cmd, check=True)
+    if base_name is None:
+        # BLIP runs ONLY ONCE in lifetime
+        temp_jpg = out_dir / "__temp.jpg"
 
-    return output_jpg
+        subprocess.run(
+            [
+                KRITA_EXE,
+                str(kra_path),
+                "--export",
+                "--export-filename",
+                str(temp_jpg),
+            ],
+            check=True,
+        )
+
+        base_name = generate_base_name(temp_jpg)
+        _save_cached_name(out_dir, base_name)
+        temp_jpg.unlink()
+
+    # ---- final export ----
+    final_jpg = out_dir / f"{base_name}_v{version:03d}.jpg"
+
+    subprocess.run(
+        [
+            KRITA_EXE,
+            str(kra_path),
+            "--export",
+            "--export-filename",
+            str(final_jpg),
+        ],
+        check=True,
+    )
+
+    return final_jpg

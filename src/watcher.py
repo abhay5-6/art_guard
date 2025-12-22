@@ -1,6 +1,7 @@
 import time
 from pathlib import Path
-from datetime import datetime
+from src.logger import logger
+
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -8,23 +9,42 @@ from watchdog.events import FileSystemEventHandler
 from src.config import ART_ROOT, IGNORE_DIRS
 from src.processor import export_kra_to_versioned_jpg
 
+DEBOUNCE_SECONDS = 1.0
 
-def placeholder_name_generator(kra_path: Path) -> str:
+
+def wait_until_stable(path: Path, checks=3, delay=0.3) -> bool:
     """
-    PLACEHOLDER for future AI-based name generation.
-    For now, returns a timestamp-based name.
+    Wait until file size stops changing.
+    Prevents reading half-written .kra files.
     """
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    last_size = -1
+
+    for _ in range(checks):
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            return False
+
+        if size == last_size:
+            return True
+
+        last_size = size
+        time.sleep(delay)
+
+    return True
 
 
 class KritaSaveHandler(FileSystemEventHandler):
+    def __init__(self):
+        self._last_event_time = {}
+
     def on_modified(self, event):
         if event.is_directory:
             return
 
         path = Path(event.src_path)
 
-        # Ignore non-kra files
+        # Only care about .kra files
         if path.suffix.lower() != ".kra":
             return
 
@@ -32,17 +52,34 @@ class KritaSaveHandler(FileSystemEventHandler):
         if any(part in IGNORE_DIRS for part in path.parts):
             return
 
-        print(f"[WATCHER] Detected save: {path}")
+        now = time.time()
+        last_time = self._last_event_time.get(path)
+
+        # Debounce
+        if last_time and (now - last_time) < DEBOUNCE_SECONDS:
+            return
+
+        self._last_event_time[path] = now
+
+        print(f"[WATCHER] Save detected: {path.name}")
+        logger.info(f"Save detected: {path}")
+
+        # Wait for file to finish writing
+        if not wait_until_stable(path):
+            print("[WATCHER] File not stable, skipping")
+            return
 
         try:
             export_kra_to_versioned_jpg(path)
-            print(f"[WATCHER] Exported JPEG for {path.name}")
+            print("[WATCHER] Export complete")
         except Exception as e:
-            print(f"[WATCHER] Error processing {path}: {e}")
+            print(f"[WATCHER] Error: {e}")
+            logger.error(f"Export failed for {path}: {e}")
 
 
 def start_watcher():
-    print(f"[WATCHER] Watching directory: {ART_ROOT}")
+    print(f"[WATCHER] Watching: {ART_ROOT}")
+    
 
     event_handler = KritaSaveHandler()
     observer = Observer()
