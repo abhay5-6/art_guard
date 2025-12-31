@@ -1,6 +1,7 @@
 import time
 from pathlib import Path
 from src.logger import logger
+POST_STABLE_DELAY = 0.5  # seconds
 
 
 from watchdog.observers import Observer
@@ -68,6 +69,8 @@ class KritaSaveHandler(FileSystemEventHandler):
         if not wait_until_stable(path):
             print("[WATCHER] File not stable, skipping")
             return
+        
+        time.sleep(POST_STABLE_DELAY)
 
         try:
             export_kra_to_versioned_jpg(path)

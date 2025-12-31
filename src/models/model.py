@@ -9,10 +9,10 @@ os.environ["HF_DATASETS_OFFLINE"] = "1"
 # Load once (important for performance)
 _processor = BlipProcessor.from_pretrained(
     "Salesforce/blip-image-captioning-base",
-     use_fast=True
+     use_fast=True , local_files_only=True
 )
 _model = BlipForConditionalGeneration.from_pretrained(
-    "Salesforce/blip-image-captioning-base"
+    "Salesforce/blip-image-captioning-base",local_files_only=True   
 )
 _model.eval()
 
@@ -55,6 +55,8 @@ def extract_semantic_tokens(caption):
 
 
 def generate_base_name(image_path):
+    print(">>> BLIP MODEL INVOKED <<<")
+
     """
     MAIN PUBLIC FUNCTION.
 

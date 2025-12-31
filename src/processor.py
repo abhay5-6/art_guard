@@ -1,8 +1,9 @@
 import subprocess
 from pathlib import Path
 
+from src.logger import logger
 from src.config import JPG_OUTPUT
-from models.model import generate_base_name
+from src.models.model import generate_base_name
 
 KRITA_EXE = r"C:\Program Files\Krita (x64)\bin\krita.exe"
 
@@ -65,6 +66,8 @@ def export_kra_to_versioned_jpg(kra_path: Path) -> Path:
 
     # ---- final export ----
     final_jpg = out_dir / f"{base_name}_v{version:03d}.jpg"
+    logger.info(f"Running Krita export for {kra_path}")
+
 
     subprocess.run(
         [
