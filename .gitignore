@@ -1,0 +1,10 @@
+# Generated outputs
+/output/
+/logs/
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+artvenv/
